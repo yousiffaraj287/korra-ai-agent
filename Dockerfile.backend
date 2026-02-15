@@ -1,0 +1,75 @@
+# ============================================================
+# KORRA — BACKEND DOCKERFILE (LANGGRAPH SERVER)
+# ============================================================
+# Description:
+#   Builds and runs the Korra LangGraph backend with integrated tools
+#   (web search, local file stats tool, and GitHub MCP integration).
+#
+# Highlights:
+#   - Python 3.11 base image
+#   - Build tooling installed for compiling C utilities
+#   - Compiles the C-based file stats tool inside the container
+#   - Runs LangGraph dev server on port 2024
+#
+# Build:
+#   docker build -t korra-backend -f Dockerfile.backend .
+#
+# Run:
+#   docker run -p 2024:2024 --env-file .env korra-backend
+#
+# Compose:
+#   See docker-compose.yml
+# ============================================================
+
+# Use Python 3.11 slim base image (smaller than full Python)
+FROM python:3.11-slim
+
+# Set working directory for the application
+WORKDIR /app
+
+# ============================================================
+# INSTALL SYSTEM DEPENDENCIES
+# ============================================================
+# Install GCC and build tools for compiling C programs
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# ============================================================
+# COPY APPLICATION FILES
+# ============================================================
+
+# Copy backend source code
+COPY graph.py .
+COPY requirements.txt .
+COPY langgraph.json .
+COPY tools/ tools/
+
+# ============================================================
+# COMPILE C TOOLS
+# ============================================================
+# Compile the C-based file statistics tool for Linux
+# Note: No .exe extension on Linux!
+
+RUN gcc -Wall -Wextra -std=c11 -O2 -o tools/file_stats tools/file_stats.c
+
+# ============================================================
+# INSTALL PYTHON DEPENDENCIES
+# ============================================================
+
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt && \
+    pip install "langgraph-cli[inmem]"
+
+# ============================================================
+# CONFIGURE APPLICATION
+# ============================================================
+
+# Expose LangGraph development server port
+EXPOSE 2024
+
+# Start LangGraph development server
+# --host 0.0.0.0 makes it accessible from outside container
+# --port 2024 specifies the listening port
+CMD ["langgraph", "dev", "--host", "0.0.0.0", "--port", "2024"]

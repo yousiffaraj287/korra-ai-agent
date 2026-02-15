@@ -1,0 +1,72 @@
+# ============================================================
+# KORRA — DOCKER COMPOSE (FULL STACK)
+# ============================================================
+# Description:
+#   Multi-container setup for the Korra AI agent system.
+#   - Backend: LangGraph server (API on port 2024)
+#   - Frontend: Agent Chat UI (web UI on port 3000)
+#
+# Usage:
+#   docker-compose up --build
+#
+# Notes:
+#   - Secrets are loaded from `.env` via env_file. Do NOT commit `.env`.
+#   - The frontend must use localhost for browser-based access to the backend.
+# ============================================================
+
+services:
+  # ============================================================
+  # BACKEND SERVICE - LangGraph Server (MCP)
+  # ============================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: korra-backend
+    ports:
+      - "2024:2024"  # Expose backend port for API access
+    env_file:
+      - .env          # Load environment variables (OpenAI, Tavily, GitHub keys)
+    networks:
+      - korra-network # Connect backend to shared bridge network
+
+    # Health check for container monitoring
+    # Ensures the LangGraph backend is reachable before the frontend starts.
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2024/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================================
+  # FRONTEND SERVICE - Agent Chat UI
+  # ============================================================
+  frontend:
+    build:
+      context: ./agent-chat-ui
+      dockerfile: Dockerfile
+      args:
+        # ⚠️ Must use localhost for browser access
+        # Ensures the frontend connects to backend at http://localhost:2024 from the user’s browser.
+        NEXT_PUBLIC_API_URL: http://localhost:2024
+    container_name: korra-frontend
+    ports:
+      - "3000:3000"  # Expose frontend web interface
+    environment:
+      # ⚠️ Must be localhost for browser access
+      # The environment variable is passed to Next.js runtime to connect to backend services.
+      - NEXT_PUBLIC_API_URL=http://localhost:2024
+    depends_on:
+      - backend       # Waits for backend to pass healthcheck before starting
+    networks:
+      - korra-network # Shares same network as backend for internal communication
+
+# ============================================================
+# NETWORK CONFIGURATION
+# ============================================================
+# Bridge network allows containers to communicate internally
+# using service names instead of IP addresses.
+networks:
+  korra-network:
+    driver: bridge

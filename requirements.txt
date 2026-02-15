@@ -1,0 +1,11 @@
+langgraph
+langchain
+langgraph-cli[inmem]
+langchain-openai
+langchain-tavily
+langchain-mcp-adapters
+langchain-core
+python-dotenv
+openai
+tiktoken
+typing-extensions
